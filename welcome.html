@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome</title>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID",
+            measurementId: "YOUR_MEASUREMENT_ID"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth();
+        const db = getFirestore(app);
+
+        let currentUser = null;
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+                document.getElementById('user-email').textContent = user.email;
+                document.getElementById('auth-content').style.display = 'block';
+                document.getElementById('comment-form').style.display = 'block';
+            } else {
+                window.location.href = 'index.html';
+            }
+        });
+
+        async function postComment(content) {
+            if (!currentUser) return;
+
+            try {
+                await addDoc(collection(db, "comments"), {
+                    content: content,
+                    author: currentUser.email,
+                    createdAt: serverTimestamp()
+                });
+                document.getElementById('comment-content').value = '';
+            } catch (e) {
+                console.error("Error adding comment: ", e);
+            }
+        }
+
+        function loadComments() {
+            const q = query(collection(db, "comments"), orderBy("createdAt", "desc"));
+            onSnapshot(q, (snapshot) => {
+                const commentsDiv = document.getElementById('comments');
+                commentsDiv.innerHTML = '';
+                snapshot.forEach((doc) => {
+                    const comment = doc.data();
+                    const commentElement = document.createElement('div');
+                    commentElement.className = 'comment';
+                    commentElement.innerHTML = `
+                        <p><strong>${comment.author}</strong>: ${comment.content}</p>
+                        <small>${comment.createdAt ? comment.createdAt.toDate().toLocaleString() : 'Just now'}</small>
+                    `;
+                    commentsDiv.appendChild(commentElement);
+                });
+            });
+        }
+
+        window.handleSignOut = async function() {
+            try {
+                await signOut(auth);
+                window.location.href = 'index.html';
+            } catch (error) {
+                console.error("Error signing out: ", error);
+            }
+        };
+
+        window.postComment = function() {
+            const content = document.getElementById('comment-content').value;
+            postComment(content);
+        };
+
+        document.addEventListener('DOMContentLoaded', loadComments);
+    </script>
+
+    <style>
+        /* Add your CSS here */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            color: #28a745;
+        }
+        #user-email {
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+        button {
+            padding: 10px;
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #c82333;
+        }
+        #comment-form {
+            margin-top: 20px;
+            display: none;
+        }
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            margin-bottom: 10px;
+        }
+        #comments {
+            margin-top: 20px;
+        }
+        .comment {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        small {
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Welcome</h1>
+        <div id="auth-content">
+            <p>You are logged in as: <span id="user-email"></span></p>
+            <button onclick="handleSignOut()">Sign Out</button>
+        </div>
+
+        <form id="comment-form">
+            <textarea id="comment-content" placeholder="Write a comment..."></textarea>
+            <button type="button" onclick="postComment()">Post Comment</button>
+        </form>
+
+        <div id="comments"></div>
+    </div>
+</body>
+</html>
